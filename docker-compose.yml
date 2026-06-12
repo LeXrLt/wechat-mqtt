@@ -1,0 +1,64 @@
+services:
+  postgres:
+    # pgvector 官方镜像，内置 vector 扩展；pg_trgm 为 contrib 可直接启用
+    image: pgvector/pgvector:pg16
+    container_name: wechat-mqtt-postgres
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      POSTGRES_USER: ${POSTGRES_USER:-wechat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wechat}
+      POSTGRES_DB: ${POSTGRES_DB:-wechat}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wechat} -d ${POSTGRES_DB:-wechat}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    # 轻量级数据库 Web 管理界面，方便开发者查看数据库
+    image: adminer:4
+    container_name: wechat-mqtt-adminer
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      - postgres
+
+  wechat-mqtt:
+    build: .
+    image: wechat-mqtt:latest
+    container_name: wechat-mqtt
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      MQTT_HOST: ${MQTT_HOST:-127.0.0.1}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-wechat-mqtt}
+      MQTT_TOPIC: ${MQTT_TOPIC:-wechat/messages}
+      ENABLED_HANDLERS: ${ENABLED_HANDLERS:-}
+      # 数据库连接
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-wechat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wechat}
+      POSTGRES_DB: ${POSTGRES_DB:-wechat}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+      # 启动时自动执行迁移
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    # 非 root 用户运行（与 Dockerfile 中 appuser uid 一致）
+    user: "1000:1000"
+
+volumes:
+  postgres_data:
