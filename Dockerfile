@@ -14,7 +14,7 @@ WORKDIR /app
 
 # 先安装依赖，利用 Docker 层缓存
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
 # 复制源码、迁移配置与入口脚本
 COPY src/ ./src/
